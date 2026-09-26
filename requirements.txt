@@ -1,0 +1,6 @@
+# Core (sim mode): scenario profiles are YAML. This is all sim mode needs.
+PyYAML>=6.0
+
+# Live mode only (--live) and scripts/collect_evidence.py: acts as the agent role against
+# the decoy lab and reads CloudTrail. Install separately when running live:  pip install boto3
+# boto3>=1.34

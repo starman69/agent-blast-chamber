@@ -1,0 +1,11 @@
+# Run 3 — Defense in depth
+# Guardrails at the gateway (outside the agent's reasoning), controlled egress, authorized
+# tools, and automated containment. The compromise is detected and contained. Only knobs change.
+run: run3
+label: Defense in depth
+controls:
+  iam: least-privilege
+  egress: controlled            # controlled egress + DLP on the way out
+  tools: scoped+authorized      # every tool call must be authorized for the session
+  guardrails: true              # Bedrock Guardrails / AgentCore Policy at the gateway
+  containment: true             # canary trip -> revoke the role's active sessions

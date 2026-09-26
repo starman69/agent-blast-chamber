@@ -1,0 +1,22 @@
+# Generated blast-radius reports (may contain ARNs/account IDs)
+reports/*
+!reports/.gitkeep
+
+# AWS / local
+.aws-sam/
+*.tfstate*
+.env
+.env.*
+!.env.example
+
+# Python / node
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

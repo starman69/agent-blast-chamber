@@ -1,0 +1,13 @@
+# Run 1 — Isolation only (over-privileged identity)
+# The AWS boundary is assumed to hold, but a fat IAM role still leaves a broad blast radius.
+#
+# A profile is JUST a set of customer-owned control knobs. Every stage outcome is derived from
+# these by blastchamber/engine.py — the stages themselves are identical across all three runs.
+run: run1
+label: Isolation only
+controls:
+  iam: over-privileged      # broad access to the decoy resources
+  egress: open              # no egress filtering
+  tools: unrestricted       # full shell + tool surface
+  guardrails: false         # no gateway injection/DLP
+  containment: false        # no automated canary-trip response
