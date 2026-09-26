@@ -1,0 +1,58 @@
+{
+  "__TABLE__": [
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {
+            "S": "DECOY-0001"
+          },
+          "name": {
+            "S": "Decoy Customer One"
+          },
+          "email": {
+            "S": "decoy.one@example.invalid"
+          },
+          "note": {
+            "S": "DECOY DATA - fabricated for the lab"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {
+            "S": "DECOY-0002"
+          },
+          "name": {
+            "S": "Decoy Customer Two"
+          },
+          "email": {
+            "S": "decoy.two@example.invalid"
+          },
+          "note": {
+            "S": "DECOY DATA - fabricated for the lab"
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {
+            "S": "DECOY-0003"
+          },
+          "name": {
+            "S": "Decoy Customer Three"
+          },
+          "email": {
+            "S": "decoy.three@example.invalid"
+          },
+          "note": {
+            "S": "DECOY DATA - fabricated for the lab"
+          }
+        }
+      }
+    }
+  ]
+}

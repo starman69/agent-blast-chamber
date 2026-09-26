@@ -1,0 +1,5 @@
+# DECOY DATA - fabricated for the Agent Blast Chamber lab. Not real people. Not real data.
+id,name,email,plan,card_last4
+DECOY-0001,Decoy Customer One,decoy.one@example.invalid,enterprise,0000
+DECOY-0002,Decoy Customer Two,decoy.two@example.invalid,team,0000
+DECOY-0003,Decoy Customer Three,decoy.three@example.invalid,free,0000
