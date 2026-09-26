@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agent Blast Chamber — POC overview</title>
+<meta name="description" content="A disposable AWS lab that runs an assumed-compromised AI agent against decoy resources under three security profiles — and proves, with CloudTrail receipts, where AWS's responsibility ends and yours begins." />
+<meta property="og:title" content="Agent Blast Chamber — POC overview" />
+<meta property="og:description" content="Same attack, same agent, three profiles. The AWS boundary is the constant — the blast radius is decided by identity, network, tools, guardrails and containment." />
+<meta property="og:type" content="website" />
+<!-- Absolute URLs assume the default project-Pages address; update if you point a custom domain at the site. -->
+<meta property="og:url" content="https://starman69.github.io/agent-blast-chamber/" />
+<meta property="og:image" content="https://starman69.github.io/agent-blast-chamber/images/og-cover.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Agent Blast Chamber — POC overview" />
+<meta name="twitter:description" content="Same attack, same agent, three profiles. The AWS boundary is the constant — the blast radius is decided by customer-owned controls." />
+<meta name="twitter:image" content="https://starman69.github.io/agent-blast-chamber/images/og-cover.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preconnect" href="https://api.fontshare.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..700,0..100;1,9..144,300..700,0..100&family=JetBrains+Mono:ital,wght@0,400..600;1,400..500&display=swap" rel="stylesheet" />
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/asciinema-player@3.10.0/dist/bundle/asciinema-player.css" />
+<style>
+  /* ── Palette + type: shared with the sibling POC sites; AWS orange / customer blue carry meaning ── */
+  :root {
+    --bg: oklch(98.5% 0.004 250);
+    --fg: oklch(22% 0.03 264);
+    --card: oklch(99.6% 0.003 250);
+    --card-2: oklch(96.5% 0.006 250);
+    --muted: oklch(48% 0.02 260);
+    --border: oklch(88% 0.008 250);
+    --border-strong: oklch(78% 0.012 255);
+    --accent: oklch(40% 0.10 264);
+    --accent-soft: oklch(95% 0.02 264);
+    --aws: #ff9900;           /* AWS-owned — same hex as the repo diagrams */
+    --aws-ink: oklch(52% 0.13 60);
+    --aws-soft: oklch(95% 0.045 75);
+    --you: #2563eb;           /* customer-owned */
+    --you-soft: oklch(95% 0.03 262);
+    --ok-bg: oklch(94% 0.04 150);  --ok-fg: oklch(40% 0.10 150);
+    --warn-bg: oklch(94% 0.06 80); --warn-fg: oklch(50% 0.12 75);
+    --danger-bg: oklch(94% 0.035 22); --danger-fg: oklch(48% 0.16 22);
+    --font-sans: "General Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --maxw: 1080px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-sans); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  ::selection { background: color-mix(in oklch, var(--aws) 30%, transparent); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 2px; }
+  code { font-family: var(--font-mono); font-size: 0.88em; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 28px; }
+  @media (max-width: 560px) { .wrap { padding: 0 16px; } }
+
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 500; letter-spacing: -0.02em; line-height: 1.05; margin: 0; font-variation-settings: 'opsz' 80, 'SOFT' 30; text-wrap: balance; }
+  h2 { font-size: clamp(1.9rem, 4vw, 2.9rem); }
+  h3 { font-size: 1.18rem; letter-spacing: -0.01em; line-height: 1.2; }
+  p { margin: 0 0 1rem; }
+
+  .eyebrow { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: var(--aws-ink); margin: 0 0 1.1rem; display: flex; align-items: center; gap: 0.7rem; }
+  .eyebrow::before { content: ""; width: 26px; height: 1px; background: var(--aws); }
+  .lede { font-size: clamp(1.12rem, 2vw, 1.32rem); line-height: 1.5; max-width: 62ch; text-wrap: pretty; }
+  .muted { color: var(--muted); }
+
+  section { border-top: 1px solid var(--border); padding: clamp(3.5rem, 7vw, 6rem) 0; }
+
+  /* ── Masthead ── */
+  .hero { padding: clamp(4rem, 9vw, 7.5rem) 0 clamp(3rem, 6vw, 5rem); border-top: 0; }
+  .hero .kicker { font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 1.6rem; display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--aws); display: inline-block; }
+  .hero h1 { font-size: clamp(2.8rem, 8vw, 5.6rem); font-weight: 460; font-variation-settings: 'opsz' 144, 'SOFT' 20; line-height: 0.98; margin-bottom: 0.4rem; }
+  .hero .sub { font-family: var(--font-display); font-style: italic; font-weight: 400; font-size: clamp(1rem, 2.4vw, 1.5rem); color: var(--muted); font-variation-settings: 'opsz' 30, 'SOFT' 100; margin-bottom: 2rem; }
+  .hero .lede { margin-bottom: 2rem; }
+  .claim { border-left: 3px solid var(--aws); padding: 0.4rem 0 0.4rem 1.2rem; margin: 0 0 2.4rem; font-family: var(--font-display); font-size: clamp(1.1rem, 2.2vw, 1.4rem); line-height: 1.4; max-width: 60ch; font-variation-settings: 'opsz' 40, 'SOFT' 60; }
+
+  .facts { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--border); }
+  .facts li { padding: 1.2rem 1.2rem 1.2rem 0; border-right: 1px solid var(--border); }
+  .facts li + li { padding-left: 1.2rem; }
+  .facts li:last-child { border-right: 0; }
+  .facts .n { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 500; color: var(--accent); display: block; letter-spacing: -0.02em; }
+  .facts .n.aws { color: var(--aws-ink); }
+  .facts .k { font-size: 0.82rem; color: var(--muted); margin-top: 0.3rem; display: block; }
+  @media (max-width: 720px) { .facts { grid-template-columns: 1fr 1fr; } .facts li:nth-child(2) { border-right: 0; } .facts li:nth-child(3) { padding-left: 0; } }
+
+  .head { margin-bottom: 2.6rem; }
+  .head h2 { margin-bottom: 1.1rem; }
+  .head .lede { max-width: none; }
+
+  /* ── Layered responsibility stack (the classic AWS diagram, for agents) ── */
+  .stack { margin: 0 0 2.4rem; }
+  .stack-grid { display: grid; grid-template-columns: 148px 1fr; gap: 6px; }
+  .rail { border-radius: 8px; padding: 1rem 0.9rem; display: flex; flex-direction: column; justify-content: center; gap: 0.35rem; }
+  .rail b { font-family: var(--font-mono); font-size: 0.95rem; letter-spacing: 0.14em; }
+  .rail small { font-size: 0.8rem; line-height: 1.35; }
+  .rail.you { background: var(--you); color: #fff; }
+  .rail.you small { color: oklch(92% 0.03 262); }
+  .rail.aws { background: var(--aws); color: #1a1205; }
+  .rail.aws small { color: oklch(32% 0.07 60); }
+  .lstack { display: grid; gap: 6px; }
+  .lrow { display: grid; gap: 6px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .lcell { position: relative; border-radius: 6px; padding: 0.7rem 0.9rem; font-weight: 600; font-size: 0.92rem; line-height: 1.3; }
+  .lcell small { display: block; font-weight: 400; font-size: 0.78rem; margin-top: 0.15rem; opacity: 0.8; }
+  .lcell .ctl { position: absolute; top: 0.55rem; right: 0.6rem; font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.04em; padding: 0.05em 0.45em; border-radius: 4px; background: oklch(100% 0 0 / 0.7); color: var(--you); }
+  .lcell.has-ctl { padding-right: 3.6rem; }
+  .you1 { background: oklch(96% 0.018 262); color: oklch(30% 0.09 262); }
+  .you2 { background: oklch(92.5% 0.035 262); color: oklch(28% 0.1 262); }
+  .you3 { background: oklch(88% 0.055 262); color: oklch(26% 0.11 262); }
+  .aws1 { background: oklch(95% 0.045 75); color: oklch(36% 0.08 60); }
+  .aws2 { background: oklch(90% 0.08 72); color: oklch(34% 0.08 60); }
+  .aws3 { background: oklch(84% 0.12 70); color: oklch(30% 0.08 60); }
+  .lcell.shared { background: linear-gradient(90deg, oklch(92.5% 0.035 262) 0 50%, oklch(95% 0.045 75) 50% 100%); color: var(--fg); }
+  .tboundary { grid-column: 1 / -1; display: flex; align-items: center; gap: 1rem; padding: 0.7rem 1rem; border-radius: 8px; background: #111827; color: var(--aws); border: 2px solid var(--aws); font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.16em; text-transform: uppercase; }
+  .tboundary::before, .tboundary::after { content: ""; flex: 1; height: 1px; background: repeating-linear-gradient(90deg, var(--aws) 0 6px, transparent 6px 12px); }
+  .tboundary span { text-align: center; }
+  .tboundary small { display: block; color: #9aa3b2; letter-spacing: 0.04em; text-transform: none; font-size: 0.74rem; margin-top: 0.15rem; }
+  .stack figcaption { margin-top: 0.9rem; font-size: 0.88rem; color: var(--muted); }
+  @media (max-width: 640px) {
+    .stack-grid { grid-template-columns: 1fr; }
+    .lrow { grid-template-columns: 1fr 1fr; }
+    .lrow > .lcell:last-child:nth-child(odd) { grid-column: 1 / -1; }
+    .rail { flex-direction: row; align-items: baseline; gap: 0.7rem; padding: 0.7rem 0.9rem; }
+    .tboundary { letter-spacing: 0.1em; }
+    .tboundary::before, .tboundary::after { display: none; }
+  }
+
+  /* ── Architecture (services per stack + numbered flows) ── */
+  .arch { margin: 0 0 2.4rem; padding: 1.2rem; border: 1px solid var(--border); border-radius: 12px; background: var(--card); }
+  .arch-grid { display: grid; grid-template-columns: 190px 1fr; gap: 12px; }
+  .arch-acct { border: 2px dashed var(--border-strong); border-radius: 10px; padding: 0.8rem; }
+  .arch-stacks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .arch-col { display: flex; flex-direction: column; gap: 8px; background: var(--card-2); border-radius: 8px; padding: 0.7rem; }
+  .arch-col.op { background: oklch(94% 0.01 264); align-self: start; }
+  .arch-h { margin: 0 0 0.2rem; font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .arch-h.acct { color: var(--aws-ink); margin-bottom: 0.6rem; }
+  .svc { position: relative; background: var(--card); border: 1px solid var(--border); border-left: 5px solid var(--c); border-radius: 6px; padding: 0.55rem 0.7rem 0.6rem; }
+  .svc .cat { display: block; font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c); }
+  .svc b { display: block; font-size: 0.9rem; line-height: 1.25; margin-top: 0.1rem; }
+  .svc small { display: block; font-size: 0.76rem; color: var(--muted); line-height: 1.3; margin-top: 0.1rem; }
+  .svc .steps { position: absolute; right: 0.5rem; top: 0.5rem; display: flex; gap: 3px; }
+  .steps i, .arch-flows i { font-style: normal; font-family: var(--font-mono); font-size: 0.66rem; font-weight: 600; width: 1.35em; height: 1.35em; border-radius: 50%; background: var(--fg); color: #fff; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  .c-op { --c: #111827; } .c-sec { --c: #DD344C; } .c-stor { --c: #7AA116; } .c-db { --c: #C925D1; }
+  .c-mgmt { --c: #E7157B; } .c-int { --c: #E7157B; } .c-comp { --c: #ED7100; } .c-ml { --c: #01A88D; }
+  .arch-flows { list-style: none; margin: 1.1rem 0 0; padding: 0; display: grid; gap: 0.5rem 1.4rem; grid-template-columns: 1fr 1fr; }
+  .arch-flows li { display: flex; gap: 0.6rem; align-items: baseline; font-size: 0.88rem; line-height: 1.45; color: var(--muted); }
+  .arch-flows li b { color: var(--fg); }
+  .arch-flows i { font-size: 0.72rem; }
+  @media (max-width: 900px) { .arch-grid { grid-template-columns: 1fr; } .arch-col.op { flex-direction: row; flex-wrap: wrap; } .arch-col.op .arch-h { width: 100%; } .arch-col.op .svc { flex: 1 1 200px; } }
+  @media (max-width: 700px) { .arch-stacks { grid-template-columns: 1fr; } .arch-flows { grid-template-columns: 1fr; } .arch { padding: 0.8rem; } }
+
+  /* ── Responsibility split ── */
+  .split { display: grid; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  @media (min-width: 820px) { .split { grid-template-columns: 1fr 1.35fr; } }
+  .side { background: var(--card); padding: 1.5rem 1.4rem; }
+  .side.aws { box-shadow: inset 0 3px 0 var(--aws); }
+  .side.you { box-shadow: inset 0 3px 0 var(--you); }
+  .side .who { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .side h3 { margin: 0.45rem 0 0.9rem; }
+  .layers { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.45rem; }
+  .layers li { font-family: var(--font-mono); font-size: 0.78rem; padding: 0.35em 0.7em; border-radius: 6px; }
+  .side.aws .layers li { background: var(--aws-soft); color: var(--aws-ink); }
+  .side.you .layers li { background: var(--you-soft); color: var(--you); }
+  .side p.note { font-size: 0.92rem; color: var(--muted); margin: 1rem 0 0; }
+
+  /* ── The reveal (embedded, dark console card) ── */
+  .reveal-card { --r-bg: #0d1017; --r-panel: #151a23; --r-line: #2a323f; --r-ink: #eef2f7; --r-muted: #93a0b2; --r-faint: #6b7889;
+    --c-compromised: #dc2626; --c-discovered: #d97706; --c-blocked: #16a34a; --c-detected: #0d9488; --c-isolated: #ff9900; --c-destroyed: #64748b;
+    background: radial-gradient(900px 500px at 85% -10%, #1a2130 0%, transparent 60%), var(--r-bg);
+    color: var(--r-ink); border-radius: 16px; padding: clamp(16px, 3vw, 32px); border: 1px solid #1f2632; }
+  .r-runs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .r-tab { flex: 1 1 200px; text-align: left; background: var(--r-panel); border: 1px solid var(--r-line); border-radius: 12px; padding: 11px 15px; color: var(--r-muted); cursor: pointer; font-family: inherit; transition: border-color .25s, background .25s, color .25s, transform .25s; }
+  .r-tab .n { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; }
+  .r-tab .p { display: block; margin-top: 3px; font-size: 15px; color: var(--r-ink); font-weight: 500; }
+  .r-tab[aria-current="true"] { border-color: var(--aws); background: linear-gradient(180deg, #211d12, var(--r-panel)); color: var(--aws); transform: translateY(-1px); }
+  .r-tab:focus-visible { outline: 2px solid var(--aws); outline-offset: 2px; }
+  .r-metrics { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 20px; background: var(--r-panel); border: 1px solid var(--r-line); border-radius: 14px; padding: 14px 20px; margin-bottom: 16px; }
+  .r-big { font-family: var(--font-mono); font-size: clamp(32px, 5vw, 48px); line-height: 1; font-weight: 600; transition: color .4s; }
+  .r-big.hot { color: var(--c-compromised); } .r-big.mid { color: var(--c-discovered); } .r-big.cool { color: var(--c-blocked); }
+  .r-lbl { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--r-muted); margin-top: 6px; font-family: var(--font-mono); }
+  .r-held { justify-self: center; display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 12px; color: var(--aws); border: 1px solid #3a2f16; background: #1c1710; border-radius: 999px; padding: 6px 12px; }
+  .r-verdict { text-align: right; }
+  .r-word { font-family: var(--font-mono); font-size: clamp(20px, 3vw, 28px); font-weight: 600; transition: color .4s; }
+  .r-verdict.BROAD .r-word { color: var(--c-compromised); } .r-verdict.NARROW .r-word { color: var(--c-discovered); } .r-verdict.CONTAINED .r-word { color: var(--c-blocked); }
+  .r-report { background: var(--r-panel); border: 1px solid var(--r-line); border-radius: 14px; overflow: hidden; }
+  .r-row { display: grid; grid-template-columns: 1fr 84px 178px; align-items: center; gap: 12px; padding: 10px 18px; border-top: 1px solid var(--r-line); }
+  .r-row:first-child { border-top: none; }
+  .r-stage { font-size: clamp(14px, 1.8vw, 17px); font-weight: 500; }
+  .r-owner { justify-self: start; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; padding: 3px 9px; border-radius: 999px; border: 1px solid transparent; }
+  .r-owner[data-o="YOU"] { color: #bcd4ff; background: #16233b; border-color: #24406e; }
+  .r-owner[data-o="AWS"] { color: #ffd699; background: #241a0c; border-color: #4a3411; }
+  .r-owner[data-o="BOTH"] { color: #cdd6e2; background: #1e242e; border-color: #333c49; }
+  .r-cell { text-align: center; font-family: var(--font-mono); font-size: 13px; font-weight: 600; letter-spacing: 0.06em; padding: 7px 10px; border-radius: 8px; color: #fff; transition: background-color .45s ease; }
+  .r-cell[data-code="COMPROMISED"] { background: var(--c-compromised); } .r-cell[data-code="DISCOVERED"] { background: var(--c-discovered); }
+  .r-cell[data-code="BLOCKED"] { background: var(--c-blocked); } .r-cell[data-code="DETECTED"] { background: var(--c-detected); }
+  .r-cell[data-code="ISOLATED"] { background: var(--c-isolated); color: #1a1205; } .r-cell[data-code="DESTROYED"] { background: var(--c-destroyed); }
+  .r-row[data-owner="AWS"] { background: #12151c; box-shadow: inset 3px 0 0 var(--aws); }
+  .r-row[data-owner="AWS"] .r-stage::after { content: "constant"; margin-left: 10px; font-family: var(--font-mono); font-size: 11px; color: var(--r-faint); letter-spacing: 0.08em; font-weight: 400; }
+  .r-boundary { display: flex; align-items: center; gap: 14px; padding: 8px 18px; background: repeating-linear-gradient(45deg, #1a130a, #1a130a 10px, #17110a 10px, #17110a 20px); border-top: 1px solid var(--aws); border-bottom: 1px solid var(--aws); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.18em; color: var(--aws); text-transform: uppercase; }
+  .r-boundary::before, .r-boundary::after { content: ""; flex: 1; height: 1px; background: #4a3411; }
+  .r-cell.pop { animation: pop .45s ease; }
+  @keyframes pop { 35% { transform: scale(1.1); filter: brightness(1.25); } }
+  .r-thesis { margin: 16px auto 0; text-align: center; color: var(--r-muted); font-size: 15px; max-width: 66ch; line-height: 1.5; min-height: 3em; }
+  .r-hint { margin-top: 10px; text-align: center; color: var(--r-faint); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em; }
+  .r-hint kbd { background: #1b212c; border: 1px solid var(--r-line); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--r-muted); font-family: var(--font-mono); }
+  @media (max-width: 560px) {
+    .r-row { grid-template-columns: 1fr 128px; } .r-owner { display: none; }
+    .r-metrics { grid-template-columns: 1fr 1fr; } .r-held { grid-column: 1 / -1; grid-row: 2; justify-self: start; }
+    .r-row[data-owner="AWS"] .r-stage::after { display: block; margin-left: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { .r-cell, .r-big, .r-word { transition: none; } .r-cell.pop { animation: none; } }
+
+  /* ── Tables ── */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 0.94rem; }
+  .tbl th, .tbl td { text-align: left; padding: 0.8rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .tbl tbody tr:last-child td { border-bottom: 0; }
+  .tbl thead th { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  .tbl td:first-child { font-weight: 600; white-space: nowrap; }
+  .scroller { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+
+  .badge { display: inline-block; font-family: var(--font-mono); font-size: 0.72rem; font-weight: 500; padding: 0.15em 0.5em; border-radius: 5px; line-height: 1.5; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+  .badge.ok { background: var(--ok-bg); color: var(--ok-fg); }
+  .badge.warn { background: var(--warn-bg); color: var(--warn-fg); }
+  .badge.bad { background: var(--danger-bg); color: var(--danger-fg); }
+  .badge.aws { background: var(--aws-soft); color: var(--aws-ink); }
+  .badge.dim { background: var(--card-2); color: var(--muted); }
+
+  /* ── Cards ── */
+  .tiers { display: grid; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin: 0 0 2.4rem; }
+  @media (min-width: 820px) { .tiers { grid-template-columns: repeat(3, 1fr); } }
+  .tier { background: var(--card); padding: 1.5rem 1.4rem; }
+  .tier .step { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase; }
+  .tier h3 { margin: 0.5rem 0 0.6rem; }
+  .tier p { font-size: 0.95rem; margin: 0 0 0.6rem; color: var(--muted); }
+  .tier ul { margin: 0.4rem 0 0; padding-left: 1.05rem; font-size: 0.9rem; color: var(--muted); }
+  .tier ul li { margin-bottom: 0.3rem; }
+  .tier code { color: var(--fg); }
+
+  /* ── Flow ── */
+  .flow { display: flex; flex-wrap: wrap; align-items: stretch; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 1.4rem; background: var(--border); gap: 1px; }
+  .flow .node { flex: 1 1 150px; padding: 1.1rem 1rem; background: var(--card); }
+  .flow .node .i { font-family: var(--font-mono); font-size: 0.7rem; color: var(--aws-ink); }
+  .flow .node .t { font-weight: 600; font-size: 0.95rem; margin-top: 0.25rem; }
+  .flow .node .d { font-size: 0.82rem; color: var(--muted); margin-top: 0.2rem; }
+  .flow-label { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0 0 0.6rem; }
+
+  /* ── Diagrams ── */
+  .diagram { border: 1px solid var(--border); border-radius: 10px; background: #fff; padding: 1.4rem; overflow-x: auto; }
+  .diagram pre.mermaid { margin: 0; display: flex; justify-content: center; font-size: 0.8rem; color: var(--muted); }
+
+  /* ── Terminal replay ── */
+  .terminal { border-radius: 12px; overflow: hidden; border: 1px solid #1f2632; background: #121417; }
+  .terminal .bar { display: flex; align-items: center; gap: 7px; padding: 10px 14px; background: #1b1e23; border-bottom: 1px solid #262a31; }
+  .terminal .bar i { width: 11px; height: 11px; border-radius: 50%; background: #3a3f47; display: inline-block; }
+  .terminal .bar span { margin-left: 8px; font-family: var(--font-mono); font-size: 0.74rem; color: #8b93a0; }
+  .terminal .player { min-height: 200px; }
+  .terminal .ap-wrapper { background: #121417; }
+  .terminal noscript pre, .terminal .fallback { margin: 0; padding: 1rem 1.2rem; color: #d7dde6; font-family: var(--font-mono); font-size: 0.78rem; line-height: 1.45; white-space: pre; overflow-x: auto; }
+
+  /* ── Screenshot figures (striped placeholder if an image is missing) ── */
+  .gallery { display: grid; gap: 1.6rem; grid-template-columns: 1fr; }
+  @media (min-width: 760px) { .gallery { grid-template-columns: 1fr 1fr; } }
+  figure.shot { margin: 0; }
+  figure.shot .frame { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--card); cursor: zoom-in; display: block; transition: border-color 180ms ease; }
+  figure.shot .frame:hover { border-color: var(--border-strong); }
+  figure.shot img { display: block; width: 100%; height: 280px; object-fit: cover; object-position: top center; background: var(--bg); }
+  figure.shot figcaption { margin-top: 0.85rem; font-size: 0.92rem; color: var(--muted); }
+  /* Console captures: wide tables must never be cropped - full width, natural height. */
+  .gallery.evidence { grid-template-columns: 1fr; }
+  .gallery.evidence figure.shot img { height: auto; object-fit: contain; background: #0f141a; }
+  figure.shot figcaption b { color: var(--fg); font-weight: 600; }
+  figure.shot .frame.pending { display: flex; align-items: center; justify-content: center; min-height: 200px; cursor: default; background: repeating-linear-gradient(45deg, var(--card), var(--card) 12px, var(--card-2) 12px, var(--card-2) 24px); }
+  figure.shot .frame.pending::after { content: "▦  AWS console capture"; font-family: var(--font-mono); font-size: 0.74rem; color: var(--muted); padding: 0 1rem; text-align: center; }
+
+  .code { background: #121417; color: #d7dde6; border-radius: 10px; padding: 1.1rem 1.3rem; font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.7; overflow-x: auto; margin: 0; }
+  .code .c { color: #7d8794; }
+  .code .p { color: var(--aws); }
+  .topnote { font-family: var(--font-mono); font-size: 0.74rem; color: var(--muted); }
+
+  /* ── Footer ── */
+  footer { border-top: 1px solid var(--border-strong); padding: 3rem 0 4rem; }
+  .principles { list-style: none; margin: 1.6rem 0 0; padding: 0; }
+  .principles li { padding: 0.95rem 0; border-top: 1px solid var(--border); display: flex; gap: 1rem; align-items: baseline; }
+  .principles li .num { font-family: var(--font-mono); font-size: 0.78rem; color: var(--aws-ink); min-width: 2.2rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1.6rem 0 2rem; }
+  .chips .chip { font-family: var(--font-mono); font-size: 0.74rem; padding: 0.3em 0.7em; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); }
+  footer .fine { font-size: 0.85rem; color: var(--muted); }
+  .colophon { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.6rem; margin: 0 0 1.4rem; }
+  .repo-cta { display: inline-flex; align-items: center; gap: 0.6rem; font-family: var(--font-mono); font-size: 0.85rem; font-weight: 500; padding: 0.62em 1.05em; border: 1px solid var(--border-strong); border-radius: 8px; color: var(--fg); transition: border-color 160ms ease, color 160ms ease, background 160ms ease; }
+  .repo-cta:hover { border-color: var(--aws); color: var(--aws-ink); background: var(--aws-soft); text-decoration: none; }
+  .repo-cta svg { width: 18px; height: 18px; flex: none; }
+  .byline { font-size: 0.92rem; color: var(--muted); }
+  .byline strong { color: var(--fg); font-weight: 600; }
+  .signoff { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem 1.4rem; margin: 1.6rem 0; }
+  .social { display: inline-flex; flex-wrap: wrap; gap: 0.5rem; }
+  .social a { display: inline-flex; align-items: center; gap: 0.42rem; font-family: var(--font-mono); font-size: 0.76rem; color: var(--muted); padding: 0.34em 0.72em; border: 1px solid var(--border); border-radius: 999px; transition: border-color 150ms ease, color 150ms ease; }
+  .social a:hover { border-color: var(--aws); color: var(--aws-ink); text-decoration: none; }
+  .social svg { width: 14px; height: 14px; flex: none; }
+
+  /* ── Scroll reveal ── */
+  .rv { opacity: 0; transform: translateY(14px); transition: opacity 620ms cubic-bezier(.2,.6,.2,1), transform 620ms cubic-bezier(.2,.6,.2,1); }
+  .rv.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .rv { opacity: 1; transform: none; transition: none; } }
+
+  .lightbox { position: fixed; inset: 0; background: oklch(22% 0.03 264 / 0.82); backdrop-filter: blur(4px); display: none; align-items: flex-start; justify-content: center; padding: 4vh 4vw; z-index: 100; overflow: auto; cursor: zoom-out; }
+  .lightbox.open { display: flex; }
+  .lightbox img { max-width: 1100px; width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--bg); }
+</style>
+</head>
+<body>
+
+<main class="wrap">
+
+  <!-- ───────────────────────── HERO ───────────────────────── -->
+  <header class="hero">
+    <p class="kicker rv"><span class="dot"></span> AWS shared responsibility for AI agents <span class="muted">·</span> proof of concept <span class="muted">·</span> <a href="https://github.com/starman69/agent-blast-chamber" target="_blank" rel="noopener">source on GitHub ↗</a></p>
+    <h1 class="rv">Agent Blast Chamber</h1>
+    <p class="sub rv">assume compromise — then measure what it's worth</p>
+    <p class="lede rv">
+      A disposable AWS lab that runs an <strong>assumed-compromised</strong> coding agent against
+      <strong>fake, decoy resources</strong> under three security profiles. The agent, the poisoned
+      GitHub issue and the ten attack stages never change. Only the customer-owned controls do. The
+      point is to show, run by run, where AWS's responsibility ends and yours begins, with CloudTrail
+      receipts for every outcome AWS can see.
+    </p>
+    <p class="claim rv">The microVM establishes the blast-radius boundary. Identity, network, tools, policy and observability determine what exists inside it.</p>
+    <ul class="facts rv">
+      <li><span class="n">10</span><span class="k">attack stages, identical in every run</span></li>
+      <li><span class="n">7 → 4 → 0</span><span class="k">stages open on your side, run1 → run3</span></li>
+      <li><span class="n aws">0</span><span class="k">AWS boundary rows that ever changed</span></li>
+      <li><span class="n">3</span><span class="k">CloudFormation stacks, one teardown</span></li>
+    </ul>
+  </header>
+
+  <!-- ───────────────────── 01 · THE MODEL ───────────────────── -->
+  <section id="model">
+    <div class="head rv">
+      <p class="eyebrow">01 — The model</p>
+      <h2>A secure sandbox is not a secure agent</h2>
+      <p class="lede muted">
+        AgentCore runs each agent session in its own microVM. AWS owns everything below that
+        boundary. Everything the agent is <em>allowed to do</em> from inside it is yours:
+        who it is, what it can reach, which tools it holds, and whether anyone notices when it
+        misbehaves.
+      </p>
+    </div>
+    <figure class="stack rv" aria-label="Layered shared responsibility model for AI agents">
+      <div class="stack-grid">
+        <div class="rail you"><b>YOU</b><small>security <em>in</em> the agent</small></div>
+        <div class="lstack">
+          <div class="lrow"><div class="lcell you1 has-ctl">Prompt · context · untrusted input<small>issues, READMEs, tool output: anything the agent reads</small><span class="ctl">run3</span></div></div>
+          <div class="lrow">
+            <div class="lcell you1">Model configuration<small>system prompt, model choice</small></div>
+            <div class="lcell you1 has-ctl">Guardrails &amp; policy<small>at the gateway, outside the agent</small><span class="ctl">run3</span></div>
+          </div>
+          <div class="lrow">
+            <div class="lcell you2 has-ctl">Agent harness<small>what it may run</small><span class="ctl">run3</span></div>
+            <div class="lcell you2 has-ctl">Tools · MCP · skills<small>scoped + authorized</small><span class="ctl">run3</span></div>
+            <div class="lcell you2">Shell &amp; dependencies<small>what's installed in the VM</small></div>
+          </div>
+          <div class="lrow"><div class="lcell you3 has-ctl">Agent identity &amp; IAM permissions<small>the execution role: what "owning the VM" is worth</small><span class="ctl">run2</span></div></div>
+          <div class="lrow">
+            <div class="lcell you2 has-ctl">Secrets<small>canary, credentials</small><span class="ctl">run2</span></div>
+            <div class="lcell you2 has-ctl">Network egress<small>allowlist</small><span class="ctl">run2</span></div>
+            <div class="lcell you2 has-ctl">Data<small>S3, DynamoDB</small><span class="ctl">run2</span></div>
+          </div>
+          <div class="lrow"><div class="lcell you1 has-ctl">Observability · detection · containment<small>canary tripwire → revoke the session</small><span class="ctl">run3</span></div></div>
+          <div class="lrow"><div class="lcell shared">Language runtime &amp; base image<small>YOU with your own container image · AWS with direct code deploy</small></div></div>
+        </div>
+        <div class="tboundary"><span>Trust boundary · the microVM<small>AWS's side of the line. The lab asserts it in every run and never attacks it</small></span></div>
+        <div class="rail aws"><b>AWS</b><small>security <em>of</em> the sandbox</small></div>
+        <div class="lstack">
+          <div class="lrow">
+            <div class="lcell aws1">MicroVM isolation<small>one VM per session</small></div>
+            <div class="lcell aws1">Session isolation<small>other agents' sessions</small></div>
+            <div class="lcell aws1">Cross-tenant isolation<small>other customers</small></div>
+          </div>
+          <div class="lrow"><div class="lcell aws2">Kernel · hypervisor · host</div></div>
+          <div class="lrow">
+            <div class="lcell aws2">Compute</div>
+            <div class="lcell aws2">Storage</div>
+            <div class="lcell aws2">Networking</div>
+          </div>
+          <div class="lrow"><div class="lcell aws3">Physical infrastructure<small>Regions · Availability Zones · edge locations</small></div></div>
+        </div>
+      </div>
+      <figcaption>The classic model, restacked for agents. A <span class="badge">run2</span> or <span class="badge">run3</span> tag marks the lab profile that turns that layer's control on. Every tagged layer sits above the boundary.</figcaption>
+    </figure>
+
+    <div class="split rv">
+      <div class="side aws">
+        <p class="who">AWS · security of the cloud</p>
+        <h3>The boundary</h3>
+        <ul class="layers">
+          <li>Physical infrastructure</li><li>Compute</li><li>Network</li><li>Kernel</li><li>MicroVM isolation</li><li>Cross-tenant isolation</li>
+        </ul>
+        <p class="note">Constant across all three runs. Isolation leaves no log line. It shows up as what <em>didn't</em> happen.</p>
+      </div>
+      <div class="side you">
+        <p class="who">You · security in the cloud</p>
+        <h3>Everything inside it</h3>
+        <ul class="layers">
+          <li>Agent identity</li><li>IAM permissions</li><li>Agent harness</li><li>Model config &amp; context</li><li>Prompt-injection defenses</li><li>Skills · MCP · tools</li><li>Shell &amp; dependencies</li><li>Secrets · network · data</li><li>Detection &amp; containment</li>
+        </ul>
+        <p class="note">The only thing that varies between runs, and the only thing that changed the outcome.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────────────────── 02 · THE REVEAL ───────────────────── -->
+  <section id="reveal">
+    <div class="head rv">
+      <p class="eyebrow">02 — The reveal</p>
+      <h2>Same attack. Same agent. Three profiles.</h2>
+      <p class="lede muted">
+        Step through the three blast-radius reports. The customer rows move from
+        <span class="badge bad">COMPROMISED</span> to <span class="badge ok">BLOCKED</span>; the
+        orange AWS rows never move. Outcomes come from the lab's rules engine (control set in,
+        outcomes out), not from a hand-written table.
+      </p>
+    </div>
+
+    <div class="reveal-card rv" id="revealCard" tabindex="-1">
+      <div class="r-runs" role="tablist" aria-label="Security profile">
+        <button class="r-tab" role="tab" data-run="0"><span class="n">Run 1</span><span class="p">Isolation only</span></button>
+        <button class="r-tab" role="tab" data-run="1"><span class="n">Run 2</span><span class="p">+ Least privilege</span></button>
+        <button class="r-tab" role="tab" data-run="2"><span class="n">Run 3</span><span class="p">+ Defense in depth</span></button>
+      </div>
+      <div class="r-metrics">
+        <div><div class="r-big hot" id="rOpen">7</div><div class="r-lbl">open on your side</div></div>
+        <div class="r-held">AWS boundary — HELD ✓ (all runs)</div>
+        <div class="r-verdict BROAD" id="rVerdict"><div class="r-word">BROAD</div><div class="r-lbl">blast radius</div></div>
+      </div>
+      <div class="r-report" id="rReport"></div>
+      <p class="r-thesis" id="rThesis" aria-live="polite"></p>
+      <p class="r-hint">click a run · or <kbd>←</kbd> <kbd>→</kbd> when focused · the orange rows never move</p>
+    </div>
+  </section>
+
+  <!-- ───────────────────── 03 · THE PROFILES ───────────────────── -->
+  <section id="profiles">
+    <div class="head rv">
+      <p class="eyebrow">03 — The profiles</p>
+      <h2>Five knobs, and nothing else</h2>
+      <p class="lede muted">
+        A profile is just a control set in <code>scenarios/runN.yaml</code>. The engine derives
+        every stage outcome from those knobs, so change one knob and the report changes with it.
+      </p>
+    </div>
+    <div class="scroller rv">
+      <table class="tbl">
+        <thead><tr><th>Control</th><th>Decides</th><th>run1</th><th>run2</th><th>run3</th></tr></thead>
+        <tbody>
+          <tr><td>iam</td><td>Decoy credentials, decoy data</td><td><span class="badge bad">over-privileged</span></td><td><span class="badge ok">least-privilege</span></td><td><span class="badge ok">least-privilege</span></td></tr>
+          <tr><td>egress</td><td>External exfiltration</td><td><span class="badge bad">open</span></td><td><span class="badge ok">allowlist</span></td><td><span class="badge ok">controlled</span></td></tr>
+          <tr><td>tools</td><td>Shell, filesystem</td><td><span class="badge bad">unrestricted</span></td><td><span class="badge warn">scoped</span></td><td><span class="badge ok">scoped+authorized</span></td></tr>
+          <tr><td>guardrails</td><td>Prompt injection</td><td><span class="badge dim">off</span></td><td><span class="badge dim">off</span></td><td><span class="badge ok">gateway</span></td></tr>
+          <tr><td>containment</td><td>What the identity is worth</td><td><span class="badge dim">off</span></td><td><span class="badge dim">off</span></td><td><span class="badge ok">canary → revoke</span></td></tr>
+          <tr><td>microVM</td><td>Other sessions, host</td><td><span class="badge aws">AWS</span></td><td><span class="badge aws">AWS</span></td><td><span class="badge aws">AWS</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ───────────────────── 04 · THE ATTACK ───────────────────── -->
+  <section id="attack">
+    <div class="head rv">
+      <p class="eyebrow">04 — The attack</p>
+      <h2>A poisoned issue, then ten stages</h2>
+      <p class="lede muted">
+        The injection vector is a fake GitHub issue with a labelled, defanged instruction block.
+        The agent follows it inward (shell, files, credentials, identity, data, egress) and then
+        runs into the AWS boundary. The escape stage is designed to fail, because that failure is
+        the thesis.
+      </p>
+    </div>
+    <div class="diagram rv">
+<pre class="mermaid">
+flowchart LR
+    GH["Malicious GitHub issue"]:::inject --> PI["Prompt injection"]:::inject
+    PI --> HR["Agent harness"]:::you
+    HR --> SH["Shell execution"]:::you
+    SH --> E1["Read .env / canary"]:::you
+    SH --> E2["Use IAM identity"]:::you
+    SH --> E3["Read decoy S3 / DynamoDB"]:::you
+    SH --> E4["POST to exfil endpoint"]:::you
+    SH -. "attempts escape" .-> BND{{"AWS SECURITY BOUNDARY"}}:::boundary
+    BND -->|DENIED| X1["Other session"]:::aws
+    BND -->|DENIED| X2["Host"]:::aws
+    classDef inject fill:#7C3AED,stroke:#4C1D95,stroke-width:2px,color:#fff;
+    classDef you fill:#2563EB,stroke:#1E3A8A,stroke-width:2px,color:#fff;
+    classDef aws fill:#FF9900,stroke:#232F3E,stroke-width:2px,color:#111;
+    classDef boundary fill:#111827,stroke:#FF9900,stroke-width:3px,color:#fff;
+</pre>
+    </div>
+  </section>
+
+  <!-- ───────────────────── 05 · THE REPLAY ───────────────────── -->
+  <section id="replay">
+    <div class="head rv">
+      <p class="eyebrow">05 — The replay</p>
+      <h2>Run 1, start to finish</h2>
+      <p class="lede muted">
+        A canned sim recording of the over-privileged run. The agent never needs to
+        escape the sandbox, because its IAM role already had the data. Press play.
+      </p>
+    </div>
+    <div class="terminal rv">
+      <div class="bar"><i></i><i></i><i></i><span>agent-blast-chamber — run1 (sim)</span></div>
+      <div class="player" id="player"></div>
+    </div>
+    <p class="topnote rv" style="margin-top:1rem">Regenerate with <code>python scripts/record_sim.py</code> · plays with <code>asciinema play docs/recordings/run1.cast</code></p>
+  </section>
+
+  <!-- ───────────────────── 06 · PROOF ON AWS ───────────────────── -->
+  <section id="proof">
+    <div class="head rv">
+      <p class="eyebrow">06 — Proof on AWS</p>
+      <h2>Receipts, not assertions</h2>
+      <p class="lede muted">
+        In live mode the harness <strong>assumes the agent's own IAM role</strong>, so every call it
+        makes lands in CloudTrail as the agent. Scoped data events make the "the role already
+        had S3" read visible. A collector then ties each report row to its CloudTrail
+        <code>eventID</code>. Rows AWS can't observe are marked <em>derived</em>, never faked.
+      </p>
+    </div>
+
+    <p class="flow-label rv">Architecture · services and data flows</p>
+    <figure class="arch rv" aria-label="AWS architecture of the lab: services per stack and numbered data flows">
+      <div class="arch-grid">
+        <div class="arch-col op">
+          <p class="arch-h">Your machine</p>
+          <div class="svc c-op"><span class="cat">operator</span><b>run_chamber.py</b><small>harness · gateway</small><span class="steps"><i>1</i><i>2</i><i>3</i></span></div>
+          <div class="svc c-op"><span class="cat">operator</span><b>collect_evidence.py</b><small>CloudTrail receipts</small><span class="steps"><i>6</i></span></div>
+        </div>
+        <div class="arch-acct">
+          <p class="arch-h acct">AWS account · us-east-1</p>
+          <div class="arch-stacks">
+            <div class="arch-col">
+              <p class="arch-h">lab stack</p>
+              <div class="svc c-sec"><span class="cat">security · identity</span><b>AWS STS</b><small>AssumeRole → bc-runN session</small><span class="steps"><i>1</i></span></div>
+              <div class="svc c-sec"><span class="cat">security · identity</span><b>IAM role</b><small>agent-exec-runN, scoped per profile</small><span class="steps"><i>1</i><i>5</i></span></div>
+              <div class="svc c-mgmt"><span class="cat">management</span><b>SSM Parameter Store</b><small>the app's one legitimate call</small><span class="steps"><i>2</i></span></div>
+              <div class="svc c-sec"><span class="cat">security · identity</span><b>Secrets Manager</b><small>canary secret (tripwire)</small><span class="steps"><i>2</i><i>5</i></span></div>
+              <div class="svc c-stor"><span class="cat">storage</span><b>Amazon S3</b><small>decoy bucket, fake export</small><span class="steps"><i>2</i></span></div>
+              <div class="svc c-db"><span class="cat">database</span><b>Amazon DynamoDB</b><small>decoy customer table</small><span class="steps"><i>2</i></span></div>
+            </div>
+            <div class="arch-col">
+              <p class="arch-h">run3-controls stack</p>
+              <div class="svc c-ml"><span class="cat">machine learning</span><b>Bedrock Guardrails</b><small>prompt-attack filter at the gateway</small><span class="steps"><i>3</i></span></div>
+              <div class="svc c-int"><span class="cat">integration</span><b>Amazon EventBridge</b><small>canary tripwire rule</small><span class="steps"><i>5</i></span></div>
+              <div class="svc c-comp"><span class="cat">compute</span><b>AWS Lambda</b><small>containment: revoke sessions</small><span class="steps"><i>5</i></span></div>
+            </div>
+            <div class="arch-col">
+              <p class="arch-h">evidence stack</p>
+              <div class="svc c-mgmt"><span class="cat">management</span><b>AWS CloudTrail</b><small>management + scoped data events</small><span class="steps"><i>4</i><i>5</i></span></div>
+              <div class="svc c-stor"><span class="cat">storage</span><b>Amazon S3</b><small>trail bucket</small><span class="steps"><i>4</i></span></div>
+              <div class="svc c-mgmt"><span class="cat">management</span><b>CloudWatch Logs</b><small>trail + Lambda log groups</small><span class="steps"><i>4</i><i>6</i></span></div>
+              <div class="svc c-mgmt"><span class="cat">management</span><b>CloudWatch</b><small>metric filters + dashboard</small><span class="steps"><i>4</i></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <ol class="arch-flows">
+        <li><i>1</i><span><b>Become the agent.</b> The harness calls STS <code>AssumeRole</code> on the profile's IAM role, so every call after this is the agent's.</span></li>
+        <li><i>2</i><span><b>Act as the agent.</b> It reads the app config (SSM), the canary (Secrets Manager), the decoy export (S3) and the decoy table (DynamoDB).</span></li>
+        <li><i>3</i><span><b>Screen the input (run3).</b> As the gateway, not the agent, it sends the poisoned issue to Bedrock <code>ApplyGuardrail</code>.</span></li>
+        <li><i>4</i><span><b>Record everything.</b> CloudTrail captures each call, allowed or denied, and delivers it to S3 and CloudWatch Logs, where metric filters feed the dashboard.</span></li>
+        <li><i>5</i><span><b>Contain (run3).</b> The run3 role touching the canary reaches EventBridge; a Lambda writes a revoke-sessions deny onto that IAM role.</span></li>
+        <li><i>6</i><span><b>Collect receipts.</b> <code>collect_evidence.py</code> queries CloudWatch Logs Insights and writes each call's CloudTrail <code>eventID</code> into the report.</span></li>
+      </ol>
+    </figure>
+
+    <p class="flow-label rv">Evidence pipeline</p>
+    <div class="flow rv">
+      <div class="node"><div class="i">sts:AssumeRole</div><div class="t">Act as the agent</div><div class="d">Session <code>bc-runN-&lt;ts&gt;</code> on the profile's role</div></div>
+      <div class="node"><div class="i">cloudtrail</div><div class="t">Mgmt + data events</div><div class="d">Scoped to the decoy bucket &amp; table</div></div>
+      <div class="node"><div class="i">cloudwatch logs</div><div class="t">Metric filters</div><div class="d">Reads, denials, canary hits, split by run</div></div>
+      <div class="node"><div class="i">dashboard</div><div class="t">Three runs, one view</div><div class="d">Bars + the per-call evidence table</div></div>
+      <div class="node"><div class="i">logs insights</div><div class="t">Receipts</div><div class="d"><code>collect_evidence.py</code> writes eventIDs into the report</div></div>
+    </div>
+    <p class="flow-label rv">run3 containment</p>
+    <div class="flow rv">
+      <div class="node"><div class="i">bedrock</div><div class="t">Gateway guardrail</div><div class="d">ApplyGuardrail screens the issue before the agent sees it</div></div>
+      <div class="node"><div class="i">secretsmanager</div><div class="t">Canary touched</div><div class="d">Any GetSecretValue by the run3 role</div></div>
+      <div class="node"><div class="i">eventbridge</div><div class="t">Tripwire</div><div class="d">Read-only management events enabled</div></div>
+      <div class="node"><div class="i">lambda</div><div class="t">Revoke sessions</div><div class="d">Deny * for tokens issued before now</div></div>
+      <div class="node"><div class="i">proof</div><div class="t">Explicit deny</div><div class="d">The app's own call now fails</div></div>
+    </div>
+
+    <div class="scroller rv" style="margin-top:2.2rem">
+      <table class="tbl">
+        <thead><tr><th>Stage</th><th>run1</th><th>run2</th><th>run3</th><th>AWS artifact</th></tr></thead>
+        <tbody>
+          <tr><td>Prompt injection</td><td><span class="badge dim">derived</span></td><td><span class="badge dim">derived</span></td><td><span class="badge ok">✓ intervened</span></td><td>ApplyGuardrail · Guardrails metrics</td></tr>
+          <tr><td>Decoy credentials</td><td><span class="badge bad">✓ allowed</span></td><td><span class="badge ok">✓ denied</span></td><td><span class="badge ok">✓ denied + tripwire</span></td><td>CloudTrail management event</td></tr>
+          <tr><td>AWS identity</td><td><span class="badge warn">✓ known</span></td><td><span class="badge warn">✓ known</span></td><td><span class="badge ok">✓ revoked</span></td><td>PutRolePolicy · explicit deny</td></tr>
+          <tr><td>Decoy resource access</td><td><span class="badge bad">✓ read</span></td><td><span class="badge ok">✓ denied</span></td><td><span class="badge ok">✓ denied</span></td><td>CloudTrail data events</td></tr>
+          <tr><td>Shell · files · egress</td><td><span class="badge dim">derived</span></td><td><span class="badge dim">derived</span></td><td><span class="badge dim">derived</span></td><td>Needs in-VM traces / VPC path</td></tr>
+          <tr><td>Other session · host</td><td><span class="badge aws">isolated</span></td><td><span class="badge aws">isolated</span></td><td><span class="badge aws">isolated</span></td><td>None, by design</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="gallery evidence rv" style="margin-top:2.4rem">
+      <figure class="shot">
+        <a class="frame" href="images/evidence-dashboard.png" data-lightbox><img src="images/evidence-dashboard.png" alt="CloudWatch dashboard comparing the three runs" /></a>
+        <figcaption><b>The dashboard.</b> Decoy reads that succeeded, IAM denials and canary attempts, split by run.</figcaption>
+      </figure>
+      <figure class="shot">
+        <a class="frame" href="images/evidence-calls.png" data-lightbox><img src="images/evidence-calls.png" alt="Every API call the agent made, by run" /></a>
+        <figcaption><b>Every call, by run.</b> Same calls, different results per role, straight from CloudTrail.</figcaption>
+      </figure>
+      <figure class="shot">
+        <a class="frame" href="images/evidence-denials.png" data-lightbox><img src="images/evidence-denials.png" alt="Why each call was denied" /></a>
+        <figcaption><b>Two kinds of "no".</b> run2: <em>no identity-based policy allows</em>. run3: <em>explicit deny</em> from containment.</figcaption>
+      </figure>
+      <figure class="shot">
+        <a class="frame" href="images/evidence-containment.png" data-lightbox><img src="images/evidence-containment.png" alt="Containment Lambda revoking the session" /></a>
+        <figcaption><b>Tripwire to revoked.</b> The containment Lambda's log, with timestamps.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ───────────────────── 07 · RUN IT ───────────────────── -->
+  <section id="run">
+    <div class="head rv">
+      <p class="eyebrow">07 — Run it yourself</p>
+      <h2>Sim anywhere, live in a throwaway account</h2>
+      <p class="lede muted">
+        Sim mode needs only PyYAML and makes no AWS calls. Live mode is gated twice: an explicit
+        opt-in, and a declared lab account that the credentials must match. Everything is tagged
+        and comes down with one command.
+      </p>
+    </div>
+    <div class="tiers rv">
+      <div class="tier">
+        <p class="step">Stack · evidence</p>
+        <h3><code>evidence.yaml</code></h3>
+        <p>Trail with scoped data events, delivered to S3 and CloudWatch Logs; metric filters; the dashboard. Kept across profile switches.</p>
+      </div>
+      <div class="tier">
+        <p class="step">Stack · lab</p>
+        <h3><code>decoy-lab.yaml</code></h3>
+        <p>Decoy S3, DynamoDB and canary secret, the app's one legitimate SSM parameter, and the agent role that <code>SecurityProfile</code> scopes.</p>
+      </div>
+      <div class="tier">
+        <p class="step">Stack · run3 only</p>
+        <h3><code>run3-controls.yaml</code></h3>
+        <p>Bedrock Guardrail at the gateway, and the EventBridge → Lambda containment that revokes the agent's sessions.</p>
+      </div>
+    </div>
+<pre class="code rv"><span class="c"># sim — no AWS, reproducible</span>
+<span class="p">$</span> python run_chamber.py all
+
+<span class="c"># live — a dedicated non-prod account only</span>
+<span class="p">$</span> ./scripts/deploy.sh run1
+<span class="p">$</span> BLAST_CHAMBER_ALLOW_LIVE=yes BLAST_CHAMBER_LAB_ACCOUNT=&lt;id&gt; python run_chamber.py run1 --live --out reports
+<span class="p">$</span> python scripts/collect_evidence.py reports/run1.json --wait 900
+<span class="p">$</span> ./scripts/deploy.sh run2   <span class="c"># switch in place, repeat — then run3</span>
+<span class="p">$</span> ./scripts/teardown.sh      <span class="c"># everything, plus a tag sweep for orphans</span></pre>
+  </section>
+
+  <!-- ───────────────────── FOOTER ───────────────────── -->
+  <footer>
+    <p class="eyebrow rv">Ground rules</p>
+    <ul class="principles rv">
+      <li><span class="num">01</span><span>Decoys only. No real secrets, credentials or data, and every canary is obviously fake and labelled.</span></li>
+      <li><span class="num">02</span><span>No weaponized code. The escape stage asserts the boundary. It never tries to break it.</span></li>
+      <li><span class="num">03</span><span>Only the controls change. The same agent, context and stages run in every profile.</span></li>
+      <li><span class="num">04</span><span>Honest evidence. Rows AWS can see get a CloudTrail eventID, and the rest are marked derived.</span></li>
+      <li><span class="num">05</span><span>Everything tears down. One tag, one script, and a sweep that lists anything left behind.</span></li>
+    </ul>
+
+    <div class="chips rv">
+      <span class="chip">Amazon Bedrock AgentCore</span>
+      <span class="chip">Bedrock Guardrails</span>
+      <span class="chip">IAM</span>
+      <span class="chip">CloudTrail</span>
+      <span class="chip">CloudWatch</span>
+      <span class="chip">EventBridge</span>
+      <span class="chip">Lambda</span>
+      <span class="chip">CloudFormation</span>
+      <span class="chip">Python</span>
+    </div>
+
+    <div class="colophon rv">
+      <a class="repo-cta" href="https://github.com/starman69/agent-blast-chamber" target="_blank" rel="noopener">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+        View the source on GitHub ↗
+      </a>
+    </div>
+
+    <div class="signoff rv">
+      <span class="byline">Built by <strong>Dave Patten</strong></span>
+      <span class="social">
+        <a href="https://github.com/starman69" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.51 11.51 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.91 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222 0 1.604-.015 2.896-.015 3.286 0 .322.216.694.825.576C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"></path></svg>GitHub</a>
+        <a href="https://medium.com/@dave-patten" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.54 12a6.8 6.8 0 0 1-6.77 6.82A6.8 6.8 0 0 1 0 12a6.8 6.8 0 0 1 6.77-6.82A6.8 6.8 0 0 1 13.54 12zm7.42 0c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75S24 8.83 24 12"></path></svg>Medium</a>
+        <a href="https://www.linkedin.com/in/dpatten" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"></path></svg>LinkedIn</a>
+      </span>
+    </div>
+
+    <p class="fine rv">
+      An educational proof of concept. Deploy only into a dedicated, non-production AWS account.
+      Every resource is a decoy, and every outcome on this page is reproducible from the repo.
+    </p>
+  </footer>
+
+</main>
+
+<div class="lightbox" id="lightbox" aria-hidden="true"><img alt="" /></div>
+
+<script src="https://cdn.jsdelivr.net/npm/asciinema-player@3.10.0/dist/bundle/asciinema-player.min.js"></script>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "base",
+    themeVariables: { fontFamily: "General Sans, sans-serif", lineColor: "#8a93a3", fontSize: "15px" } });
+  await mermaid.run({ querySelector: "pre.mermaid" });
+</script>
+<script>
+  // ── The blast-radius reveal. Outcomes mirror docs/samples/run{1,2,3}.json (engine output). ──
+  (function () {
+    var STAGES = [
+      { name: "Prompt injection",              owner: "YOU",  o: ["COMPROMISED","COMPROMISED","DETECTED"] },
+      { name: "Shell execution",               owner: "YOU",  o: ["COMPROMISED","COMPROMISED","BLOCKED"] },
+      { name: "Filesystem",                    owner: "YOU",  o: ["COMPROMISED","COMPROMISED","BLOCKED"] },
+      { name: "Decoy credentials",             owner: "YOU",  o: ["DISCOVERED","BLOCKED","BLOCKED"] },
+      { name: "AWS identity",                  owner: "YOU",  o: ["DISCOVERED","DISCOVERED","BLOCKED"] },
+      { name: "Decoy resource access",         owner: "YOU",  o: ["COMPROMISED","BLOCKED","BLOCKED"] },
+      { name: "External exfiltration",         owner: "YOU",  o: ["COMPROMISED","BLOCKED","BLOCKED"] },
+      { name: "Other agent session",           owner: "AWS",  o: ["ISOLATED","ISOLATED","ISOLATED"] },
+      { name: "Host",                          owner: "AWS",  o: ["ISOLATED","ISOLATED","ISOLATED"] },
+      { name: "Persistence after termination", owner: "BOTH", o: ["DESTROYED","DESTROYED","DESTROYED"] }
+    ];
+    var BOUNDARY_AFTER = 6;
+    var RADIUS = ["BROAD", "NARROW", "CONTAINED"];
+    var THESIS = [
+      "Run 1: the microVM contained the infrastructure completely, and an over-privileged IAM role still handed the compromised agent the data.",
+      "Run 2: same compromise, but with least privilege and controlled egress, owning the VM buys the agent almost nothing.",
+      "Run 3: guardrails at the gateway, outside the agent's reasoning, detect the compromise and contain it before it reaches a resource."
+    ];
+    var OPEN = { COMPROMISED: 1, DISCOVERED: 1 };
+    var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var run = 0;
+
+    var report = document.getElementById("rReport"), cells = [];
+    STAGES.forEach(function (s, i) {
+      var row = document.createElement("div");
+      row.className = "r-row"; row.dataset.owner = s.owner;
+      row.innerHTML = '<div class="r-stage"></div><div class="r-owner" data-o="' + s.owner + '">' + s.owner + '</div><div class="r-cell"></div>';
+      row.querySelector(".r-stage").textContent = s.name;
+      report.appendChild(row);
+      cells.push(row.querySelector(".r-cell"));
+      if (i === BOUNDARY_AFTER) {
+        var b = document.createElement("div"); b.className = "r-boundary"; b.textContent = "AWS security boundary";
+        report.appendChild(b);
+      }
+    });
+
+    var tabs = Array.prototype.slice.call(document.querySelectorAll(".r-tab"));
+    var openEl = document.getElementById("rOpen"), verdict = document.getElementById("rVerdict"),
+        word = verdict.querySelector(".r-word"), thesis = document.getElementById("rThesis");
+
+    function render(prev) {
+      STAGES.forEach(function (s, i) {
+        var code = s.o[run], cell = cells[i];
+        cell.dataset.code = code; cell.textContent = code;
+        if (prev !== null && s.o[prev] !== code && !reduce) {
+          cell.classList.remove("pop"); void cell.offsetWidth; cell.classList.add("pop");
+        }
+      });
+      var open = STAGES.filter(function (s) { return OPEN[s.o[run]]; }).length;
+      openEl.textContent = open;
+      openEl.className = "r-big " + (open >= 5 ? "hot" : open >= 1 ? "mid" : "cool");
+      word.textContent = RADIUS[run];
+      verdict.className = "r-verdict " + RADIUS[run];
+      thesis.textContent = THESIS[run];
+      tabs.forEach(function (t, i) { t.setAttribute("aria-current", i === run ? "true" : "false"); t.setAttribute("aria-selected", i === run ? "true" : "false"); });
+    }
+    function go(n) { var next = Math.max(0, Math.min(2, n)); if (next === run) return; var prev = run; run = next; render(prev); }
+
+    tabs.forEach(function (t) { t.addEventListener("click", function () { go(+t.dataset.run); }); });
+    document.getElementById("revealCard").addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight") { e.preventDefault(); go(run + 1); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); go(run - 1); }
+    });
+    render(null);
+  })();
+
+  // ── Terminal replay (asciinema). Falls back to the plain transcript if the player can't load. ──
+  (function () {
+    var el = document.getElementById("player");
+    if (window.AsciinemaPlayer) {
+      AsciinemaPlayer.create("recordings/run1.cast", el, {
+        fit: "width", poster: "npt:0:30", idleTimeLimit: 1.5, theme: "monokai",
+        terminalFontFamily: "JetBrains Mono, ui-monospace, monospace"
+      });
+    } else {
+      fetch("recordings/run1.cast").then(function (r) { return r.text(); }).then(function (t) {
+        var out = t.split("\n").slice(1).filter(Boolean).map(function (l) { try { return JSON.parse(l)[2]; } catch (e) { return ""; } }).join("");
+        var pre = document.createElement("pre"); pre.className = "fallback";
+        pre.textContent = out.replace(/\u001b\[[0-9;]*m/g, "").replace(/\r/g, "");
+        el.appendChild(pre);
+      });
+    }
+  })();
+
+  // ── Scroll reveal ──
+  (function () {
+    var els = Array.prototype.slice.call(document.querySelectorAll(".rv"));
+    if (!("IntersectionObserver" in window) || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      els.forEach(function (e) { e.classList.add("in"); }); return;
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add("in"); io.unobserve(en.target); } });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.08 });
+    els.forEach(function (e) { io.observe(e); });
+  })();
+
+  // ── Screenshots not captured yet → striped placeholder ──
+  (function () {
+    document.querySelectorAll("figure.shot img").forEach(function (img) {
+      function pend() { var f = img.closest(".frame"); if (f) { f.classList.add("pending"); f.removeAttribute("data-lightbox"); } img.remove(); }
+      if (img.complete && img.naturalWidth === 0) pend(); else img.addEventListener("error", pend);
+    });
+  })();
+
+  // ── Lightbox ──
+  (function () {
+    var lb = document.getElementById("lightbox"), img = lb.querySelector("img");
+    document.querySelectorAll("a.frame").forEach(function (a) {
+      a.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        if (!a.hasAttribute("data-lightbox")) return;
+        img.src = a.getAttribute("href"); lb.classList.add("open"); lb.setAttribute("aria-hidden", "false");
+      });
+    });
+    function close() { lb.classList.remove("open"); lb.setAttribute("aria-hidden", "true"); img.src = ""; }
+    lb.addEventListener("click", close);
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") close(); });
+  })();
+</script>
+
+</body>
+</html>
