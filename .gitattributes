@@ -1,0 +1,3 @@
+# The GitHub Pages overview is documentation, not the POC's code - keep it out of the
+# repository language stats so they reflect the lab (Python engine + shell scripts).
+site/** linguist-documentation
